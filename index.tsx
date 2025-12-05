@@ -1,7 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu } from 'lucide-react';
+import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu, Upload, Download, Trash2 } from 'lucide-react';
 
 // --- Types ---
 
@@ -28,6 +27,16 @@ interface LogEntry {
   type: 'narrative' | 'mythic' | 'system' | 'combat' | 'alert';
   content: string;
   details?: string;
+}
+
+interface GameState {
+  agents: Agent[];
+  chaosFactor: number;
+  logs: LogEntry[];
+  threads: string[];
+  npcs: string[];
+  locations: string[];
+  scene: string;
 }
 
 type Odds = 'Impossible' | 'No Way' | 'Unlikely' | '50/50' | 'Likely' | 'Sure Thing' | 'Has To Be';
@@ -242,6 +251,7 @@ const DeltaGreenApp = () => {
   const [logs, setLogs] = useState<LogEntry[]>(INITIAL_LOGS);
   const [logInput, setLogInput] = useState('');
   const [showHelp, setShowHelp] = useState(true);
+  const [showSaveMenu, setShowSaveMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'game' | 'log' | 'agents'>('log'); // Mobile tabs
   
   // Adventure Lists
@@ -254,6 +264,37 @@ const DeltaGreenApp = () => {
   const [fateQuestion, setFateQuestion] = useState('');
   
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Persistance Logic ---
+  
+  // Load from local storage on mount
+  useEffect(() => {
+    const savedData = localStorage.getItem('dg_ops_data');
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        setAgents(parsed.agents);
+        setChaosFactor(parsed.chaosFactor);
+        setLogs(parsed.logs);
+        setThreads(parsed.threads);
+        setNpcs(parsed.npcs);
+        setLocations(parsed.locations);
+        setScene(parsed.scene);
+        addLog('system', 'Mission data restored from local storage.');
+      } catch (e) {
+        console.error('Failed to load save data', e);
+      }
+    }
+  }, []);
+
+  // Save to local storage whenever state changes
+  useEffect(() => {
+    const gameState: GameState = {
+      agents, chaosFactor, logs, threads, npcs, locations, scene
+    };
+    localStorage.setItem('dg_ops_data', JSON.stringify(gameState));
+  }, [agents, chaosFactor, logs, threads, npcs, locations, scene]);
 
   useEffect(() => {
     // Scroll to bottom of log on update
@@ -277,6 +318,68 @@ const DeltaGreenApp = () => {
 
   const updateAgent = (updatedAgent: Agent) => {
     setAgents(prev => prev.map(a => a.id === updatedAgent.id ? updatedAgent : a));
+  };
+
+  const handleExport = () => {
+    const gameState: GameState = {
+      agents, chaosFactor, logs, threads, npcs, locations, scene
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(gameState));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "delta-green-save.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    setShowSaveMenu(false);
+    addLog('system', 'Mission data exported to file.');
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
+        // Validate minimal structure
+        if (parsed.agents && parsed.logs) {
+          setAgents(parsed.agents);
+          setChaosFactor(parsed.chaosFactor);
+          setLogs(parsed.logs);
+          setThreads(parsed.threads || []);
+          setNpcs(parsed.npcs || []);
+          setLocations(parsed.locations || []);
+          setScene(parsed.scene || 'Unknown Scene');
+          addLog('system', 'Mission data imported successfully.');
+          setShowSaveMenu(false);
+        } else {
+          alert("Invalid save file format");
+        }
+      } catch (err) {
+        alert("Failed to parse save file");
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleReset = () => {
+    if (confirm("Are you sure? This will wipe all current progress.")) {
+      setAgents(INITIAL_AGENTS);
+      setChaosFactor(5);
+      setLogs(INITIAL_LOGS);
+      setThreads(['Operation: VISCID GLIMMER', 'Find Elias Vance']);
+      setNpcs(['Handler (Control)']);
+      setLocations(['Vance\'s Apartment', 'University of Chicago', 'Woodfield Mall']);
+      setScene('Scene 2: The Mall Meeting');
+      localStorage.removeItem('dg_ops_data');
+      setShowSaveMenu(false);
+      addLog('alert', 'SYSTEM RESET. Factory defaults restored.');
+    }
   };
 
   // --- Mythic Logic ---
@@ -391,6 +494,13 @@ const DeltaGreenApp = () => {
               </div>
             </div>
 
+            <div className="mt-6 p-4 bg-slate-900 rounded border border-slate-700">
+              <h4 className="text-sm font-bold text-amber-500 mb-2 flex items-center gap-2"><Save className="w-4 h-4" /> SAVING & LOADING</h4>
+              <p className="text-xs text-slate-300">
+                The app <strong>auto-saves</strong> to this browser. To move between computers or keep backups, use the <strong>SAVE</strong> button in the header to <strong>Export</strong> a .json file.
+              </p>
+            </div>
+
             <button onClick={() => setShowHelp(false)} className="w-full mt-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded transition-colors">
               ENTER OPERATION
             </button>
@@ -398,8 +508,25 @@ const DeltaGreenApp = () => {
         </div>
       )}
 
+      {/* Save/Load Menu Overlay */}
+      {showSaveMenu && (
+        <div className="absolute top-14 right-4 w-64 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-40 p-2 flex flex-col gap-2">
+           <button onClick={handleExport} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-700 rounded text-sm text-left">
+             <Download className="w-4 h-4 text-emerald-400" /> Export Mission File
+           </button>
+           <label className="flex items-center gap-3 px-4 py-2 hover:bg-slate-700 rounded text-sm text-left cursor-pointer">
+             <Upload className="w-4 h-4 text-blue-400" /> Import Mission File
+             <input type="file" accept=".json" ref={fileInputRef} onChange={handleImport} className="hidden" />
+           </label>
+           <div className="h-px bg-slate-700 my-1"></div>
+           <button onClick={handleReset} className="flex items-center gap-3 px-4 py-2 hover:bg-red-900/50 rounded text-sm text-left text-red-400">
+             <Trash2 className="w-4 h-4" /> Factory Reset
+           </button>
+        </div>
+      )}
+
       {/* Header */}
-      <header className="bg-slate-900 border-b border-emerald-900/30 p-3 md:p-4 flex items-center justify-between shadow-md z-10 shrink-0">
+      <header className="bg-slate-900 border-b border-emerald-900/30 p-3 md:p-4 flex items-center justify-between shadow-md z-10 shrink-0 relative">
         <div className="flex items-center gap-3">
           <Shield className="text-emerald-500 w-6 h-6 md:w-8 md:h-8" />
           <div>
@@ -407,11 +534,21 @@ const DeltaGreenApp = () => {
             <p className="text-[10px] md:text-xs text-slate-400 uppercase tracking-wide hidden md:block">Operation Manager // Clearance: TOP SECRET</p>
           </div>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 md:gap-6">
           <div className="flex flex-col items-end hidden md:flex">
             <span className="text-xs text-slate-500 uppercase">Operation</span>
             <span className="font-mono text-emerald-400">VISCID GLIMMER</span>
           </div>
+          
+          <button 
+            onClick={() => setShowSaveMenu(!showSaveMenu)}
+            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded border border-slate-700 transition-colors"
+            title="Save/Load Data"
+          >
+            <Save className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-bold hidden md:inline">SAVE</span>
+          </button>
+
           <button 
             onClick={() => setShowHelp(true)}
             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded border border-slate-700 transition-colors"
