@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu, Upload, Download, Trash2, List } from 'lucide-react';
+import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu, Upload, Download, Trash2, List, Plus, Camera } from 'lucide-react';
 
 // --- Types ---
 
@@ -11,6 +11,7 @@ interface Agent {
   name: string;
   profession: string;
   description: string;
+  image?: string; // Base64 image string
   stats: Record<Stat, number>;
   derived: {
     hp: { current: number; max: number };
@@ -65,8 +66,12 @@ const INITIAL_AGENTS: Agent[] = [
       wp: { current: 11, max: 11 },
       san: { current: 55, max: 99, break: 44 },
     },
-    skills: ['Firearms 50%', 'Humint 60%', 'Law 40%', 'Search 50%', 'Unarmed 50%'],
-    gear: ['Glock 17', 'Badge & ID', 'Kevlar Vest', 'Handcuffs', 'Unmarked Sedan']
+    skills: [
+      'Alertness 60%', 'Athletics 50%', 'Criminology 50%', 'Dodge 40%', 
+      'Drive 50%', 'Firearms 50%', 'Humint 60%', 'Law 40%', 
+      'Melee Weapons 50%', 'Persuade 50%', 'Search 50%', 'Unarmed 60%'
+    ],
+    gear: ['Glock 17', 'Badge & ID', 'Kevlar Vest', 'Handcuffs', 'Unmarked Sedan', 'Smartphone']
   },
   {
     id: 'tom',
@@ -79,8 +84,12 @@ const INITIAL_AGENTS: Agent[] = [
       wp: { current: 14, max: 14 },
       san: { current: 70, max: 99, break: 56 },
     },
-    skills: ['First Aid 60%', 'Medicine 50%', 'Pharmacy 40%', 'Science (Biology) 40%'],
-    gear: ['Trauma Bag', 'Nitrile Gloves', 'Headlamp', 'Multi-tool', 'Personal SUV']
+    skills: [
+      'Alertness 50%', 'Biology 40%', 'Bureaucracy 40%', 'Drive 40%', 
+      'First Aid 60%', 'Forensics 30%', 'Humint 40%', 'Medicine 50%', 
+      'Persuade 40%', 'Pharmacy 40%', 'Search 40%', 'Science (Chemistry) 40%'
+    ],
+    gear: ['Trauma Bag', 'Nitrile Gloves', 'Headlamp', 'Multi-tool', 'Personal SUV', 'PPE Kit']
   },
   {
     id: 'paul',
@@ -93,7 +102,11 @@ const INITIAL_AGENTS: Agent[] = [
       wp: { current: 14, max: 14 },
       san: { current: 70, max: 99, break: 56 },
     },
-    skills: ['History 70%', 'Occult 50%', 'Language (Latin) 50%', 'Research 60%'],
+    skills: [
+      'Anthropology 50%', 'Archaeology 50%', 'Bureaucracy 40%', 'History 70%', 
+      'Humint 50%', 'Language (Latin) 50%', 'Language (Spanish) 40%', 
+      'Occult 50%', 'Persuade 60%', 'Research 60%'
+    ],
     gear: ['Laptop', 'Voice Recorder', 'Notebook', 'Library Keycard', 'Volvo Station Wagon']
   }
 ];
@@ -179,6 +192,32 @@ const ODDS_MAP: Record<Odds, number> = {
   'Has To Be': 4,
 };
 
+const MYTHIC_ACTIONS = [
+  'Attainment', 'Starting', 'Neglect', 'Fight', 'Recruit', 'Triumph', 'Violate', 'Oppose', 'Malice', 'Communicate',
+  'Persecute', 'Increase', 'Decrease', 'Abandon', 'Gratify', 'Inquire', 'Antagonize', 'Move', 'Waste', 'Truce',
+  'Release', 'Befriend', 'Judge', 'Desert', 'Dominate', 'Procrastinate', 'Praise', 'Separate', 'Take', 'Break',
+  'Heal', 'Delay', 'Stop', 'Lie', 'Return', 'Imitate', 'Struggle', 'Inform', 'Bestow', 'Postpone',
+  'Expose', 'Haggle', 'Imprison', 'Release', 'Celebrate', 'Develop', 'Travel', 'Block', 'Harm', 'Debase',
+  'Overindulge', 'Adjourn', 'Adversity', 'Kill', 'Disrupt', 'Usurp', 'Create', 'Betray', 'Agree', 'Abuse',
+  'Oppress', 'Inspect', 'Ambush', 'Spy', 'Attach', 'Carry', 'Open', 'Carelessness', 'Ruins', 'Extravagance',
+  'Trick', 'Arrive', 'Propose', 'Divide', 'Refuse', 'Mistrust', 'Deceive', 'Cruelty', 'Intolerance', 'Trust',
+  'Excitement', 'Activity', 'Assist', 'Care', 'Negligence', 'Passion', 'Work', 'Control', 'Attract', 'Failure',
+  'Pursue', 'Vengeance', 'Proceedings', 'Dispute', 'Punish', 'Guide', 'Transform', 'Overthrow', 'Oppress', 'Change'
+];
+
+const MYTHIC_DESCRIPTORS = [
+  'Abnormally', 'Adventurously', 'Aggressively', 'Angrily', 'Anxiously', 'Awkwardly', 'Beautifully', 'Bleakly', 'Boldly', 'Bravely',
+  'Busily', 'Calmly', 'Carefully', 'Carelessly', 'Cautiously', 'Ceaselessly', 'Cheerfully', 'Combatively', 'Coolly', 'Crazily',
+  'Curiously', 'Dangerously', 'Defiantly', 'Deliberately', 'Delicately', 'Delightfully', 'Dimly', 'Efficiently', 'Energetically', 'Enormously',
+  'Enthusiastically', 'Excitedly', 'Fearfully', 'Ferociously', 'Fiercely', 'Foolishly', 'Fortunately', 'Frantically', 'Freely', 'Frighteningly',
+  'Fully', 'Generously', 'Gently', 'Gladly', 'Gracefully', 'Gratefully', 'Happily', 'Hastily', 'Healthily', 'Helpfully',
+  'Helplessly', 'Hopelessly', 'Innocently', 'Intensely', 'Interestingly', 'Irritatingly', 'Jovially', 'Joyfully', 'Judgementally', 'Kindly',
+  'Kookily', 'Lazily', 'Lightly', 'Loosely', 'Loudly', 'Lovingly', 'Loyally', 'Majestically', 'Meaningfully', 'Mechanically',
+  'Miserably', 'Mockingly', 'Mysteriously', 'naturally', 'Neatly', 'Nicely', 'Oddly', 'Offensively', 'Officially', 'Partially',
+  'Passively', 'Peacefully', 'Perfectly', 'Playfully', 'Politely', 'Positively', 'Powerfully', 'Quaintly', 'Quarrelsomely', 'Quietly',
+  'Roughly', 'Rudely', 'Ruthlessly', 'Slowly', 'Softly', 'Swiftly', 'Threateningly', 'Very', 'Violently', 'Wildly'
+];
+
 // Mythic Fate Chart Logic (Simplified 2nd Edition Logic for UI)
 const getFateProbability = (chaos: number, odds: Odds): number => {
   // Base probability map (Chaos Rank 5)
@@ -206,11 +245,33 @@ const getFateProbability = (chaos: number, odds: Odds): number => {
 
 const AgentCard: React.FC<{ agent: Agent; updateAgent: (a: Agent) => void }> = ({ agent, updateAgent }) => {
   const [expanded, setExpanded] = useState(false);
+  const [isAddingSkill, setIsAddingSkill] = useState(false);
+  const [newSkill, setNewSkill] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const adjustStat = (type: 'hp' | 'wp' | 'san', val: number) => {
     const newAgent = { ...agent };
     newAgent.derived[type].current = Math.max(0, Math.min(newAgent.derived[type].max, newAgent.derived[type].current + val));
     updateAgent(newAgent);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      updateAgent({ ...agent, image: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddSkill = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSkill.trim()) return;
+    updateAgent({ ...agent, skills: [...agent.skills, newSkill] });
+    setNewSkill('');
+    setIsAddingSkill(false);
   };
 
   return (
@@ -219,11 +280,29 @@ const AgentCard: React.FC<{ agent: Agent; updateAgent: (a: Agent) => void }> = (
         className="flex justify-between items-start mb-2 cursor-pointer hover:bg-slate-700/50 rounded p-1 -m-1"
         onClick={() => setExpanded(!expanded)}
       >
-        <div>
-          <h3 className="text-lg font-bold text-emerald-400">{agent.name}</h3>
-          <p className="text-xs text-slate-400 uppercase tracking-wider">{agent.profession}</p>
+        <div className="flex items-center gap-3">
+           {/* Avatar / Upload */}
+           <div 
+             className="w-12 h-12 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center overflow-hidden relative group/avatar"
+             onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+           >
+             {agent.image ? (
+               <img src={agent.image} alt={agent.name} className="w-full h-full object-cover" />
+             ) : (
+               <User className="w-6 h-6 text-slate-500" />
+             )}
+             <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+               <Camera className="w-4 h-4 text-white" />
+             </div>
+             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+           </div>
+           
+           <div>
+            <h3 className="text-lg font-bold text-emerald-400">{agent.name}</h3>
+            <p className="text-xs text-slate-400 uppercase tracking-wider">{agent.profession}</p>
+           </div>
         </div>
-        <User className={`w-5 h-5 text-slate-500 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+        <ChevronRight className={`w-5 h-5 text-slate-500 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
       </div>
 
       <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs font-mono text-slate-300">
@@ -276,7 +355,27 @@ const AgentCard: React.FC<{ agent: Agent; updateAgent: (a: Agent) => void }> = (
           </div>
           
           <div>
-            <p className="text-xs text-slate-400 mb-1 font-bold flex items-center gap-1"><Brain className="w-3 h-3" /> SKILLS</p>
+            <div className="flex justify-between items-center mb-1">
+               <p className="text-xs text-slate-400 font-bold flex items-center gap-1"><Brain className="w-3 h-3" /> SKILLS</p>
+               <button onClick={() => setIsAddingSkill(!isAddingSkill)} className="text-xs text-emerald-500 hover:text-emerald-400 flex items-center gap-1">
+                  <Plus className="w-3 h-3" /> Add
+               </button>
+            </div>
+            
+            {isAddingSkill && (
+              <form onSubmit={handleAddSkill} className="flex gap-2 mb-2">
+                <input 
+                  type="text" 
+                  value={newSkill} 
+                  onChange={(e) => setNewSkill(e.target.value)} 
+                  placeholder="Skill Name %"
+                  className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:border-emerald-500 outline-none"
+                  autoFocus
+                />
+                <button type="submit" className="bg-emerald-700 hover:bg-emerald-600 px-2 py-1 rounded text-xs">OK</button>
+              </form>
+            )}
+
             <div className="flex flex-wrap gap-1">
               {agent.skills.map((skill, idx) => (
                 <span key={idx} className="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">{skill}</span>
@@ -293,12 +392,6 @@ const AgentCard: React.FC<{ agent: Agent; updateAgent: (a: Agent) => void }> = (
             </div>
           </div>
         </div>
-      )}
-
-      {!expanded && (
-         <div className="mt-2 text-center group-hover:translate-y-1 transition-transform duration-300">
-            <ChevronRight className="w-4 h-4 text-slate-600 mx-auto rotate-90" />
-         </div>
       )}
     </div>
   );
@@ -524,31 +617,29 @@ const DeltaGreenApp = () => {
     if (window.innerWidth < 768) setActiveTab('log');
 
     if (randomEvent) {
+      // Generate Focus
+      const focusRoll = Math.floor(Math.random() * 100) + 1;
+      let focus = '';
+      if (focusRoll <= 7) focus = 'Remote Event';
+      else if (focusRoll <= 28) focus = 'NPC Action';
+      else if (focusRoll <= 35) focus = 'Introduce New NPC';
+      else if (focusRoll <= 45) focus = 'Move Toward a Thread';
+      else if (focusRoll <= 52) focus = 'Move Away from a Thread';
+      else if (focusRoll <= 55) focus = 'Close a Thread';
+      else if (focusRoll <= 67) focus = 'PC Negative';
+      else if (focusRoll <= 75) focus = 'PC Positive';
+      else if (focusRoll <= 83) focus = 'Ambiguous Event';
+      else focus = 'NPC Negative';
+
+      // Generate Meaning
+      const actionWord = MYTHIC_ACTIONS[Math.floor(Math.random() * MYTHIC_ACTIONS.length)];
+      const descWord = MYTHIC_DESCRIPTORS[Math.floor(Math.random() * MYTHIC_DESCRIPTORS.length)];
+
       addLog('alert', 'RANDOM EVENT TRIGGERED!', `Doubles rolled (${roll}) under Chaos Factor (${chaosFactor}).`);
-      generateRandomEvent();
+      addLog('mythic', `EVENT: ${focus} (${focusRoll})`, `Meaning: ${actionWord} / ${descWord}`);
     }
 
     setFateQuestion('');
-  };
-
-  const generateRandomEvent = () => {
-    const focusRoll = Math.floor(Math.random() * 100) + 1;
-    let focus = '';
-    if (focusRoll <= 7) focus = 'Remote Event';
-    else if (focusRoll <= 28) focus = 'NPC Action';
-    else if (focusRoll <= 35) focus = 'Introduce New NPC';
-    else if (focusRoll <= 45) focus = 'Move Toward a Thread';
-    else if (focusRoll <= 52) focus = 'Move Away from a Thread';
-    else if (focusRoll <= 55) focus = 'Close a Thread';
-    else if (focusRoll <= 67) focus = 'PC Negative';
-    else if (focusRoll <= 75) focus = 'PC Positive';
-    else if (focusRoll <= 83) focus = 'Ambiguous Event';
-    else focus = 'NPC Negative';
-
-    const actionRoll1 = Math.floor(Math.random() * 100);
-    const actionRoll2 = Math.floor(Math.random() * 100);
-    
-    addLog('mythic', `EVENT FOCUS: ${focus} (${focusRoll})`, `Context: [Action ${actionRoll1}] + [Subject ${actionRoll2}] (Interpret from table)`);
   };
 
   const handleDiceRoll = (sides: number) => {
@@ -605,6 +696,8 @@ const DeltaGreenApp = () => {
                 <ul className="text-xs text-slate-400 text-left space-y-2">
                   <li>• <strong>Roster:</strong> View health (HP), willpower (WP), and sanity (SAN).</li>
                   <li>• <strong>Expand:</strong> Click an agent to see Skills, Gear, and Bio.</li>
+                  <li>• <strong>Photo:</strong> Click the avatar icon to upload a character portrait.</li>
+                  <li>• <strong>Skills:</strong> Click "Add" to type in custom skills.</li>
                   <li>• <strong>Edit:</strong> Use + / - buttons to adjust stats during play.</li>
                 </ul>
               </div>
