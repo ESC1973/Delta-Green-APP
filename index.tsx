@@ -91,6 +91,12 @@ const INITIAL_LOGS: LogEntry[] = [
     timestamp: '09:01',
     type: 'narrative',
     content: 'BRIEFING: Operation VISCID GLIMMER\n\nTARGET: Elias Vance (Grad Student, U of Chicago).\nSTATUS: Missing (48hrs).\n\nDETAILS: Vance was researching "Hyper-geometry in Pre-Columbian Architecture." Local PD report he is a runaway, but responding officer reported nausea and disorientation upon entering Vance\'s apartment. Apartment contains strange charcoal scrawls.\n\nOBJECTIVES:\n1. Locate Vance.\n2. Assess potential unnatural threat.\n3. Contain/Sanitize.'
+  },
+  {
+    id: 'init-3',
+    timestamp: '10:30',
+    type: 'narrative',
+    content: 'SCENE 2: THE MALL MEETING\n\nLocation: Woodfield Mall. Time: 10:30 AM.\n\nThe team meets in a quiet corner of the food court to formulate a plan. The atmosphere is mundane—shoppers, pretzels, coffee—contrasting with the grim briefing. You need to decide how to approach the two primary leads: the Apartment (the crime scene) and the University (the research).'
   }
 ];
 
@@ -241,8 +247,8 @@ const DeltaGreenApp = () => {
   // Adventure Lists
   const [threads, setThreads] = useState<string[]>(['Operation: VISCID GLIMMER', 'Find Elias Vance']);
   const [npcs, setNpcs] = useState<string[]>(['Handler (Control)']);
-  const [locations, setLocations] = useState<string[]>(['Vance\'s Apartment', 'University of Chicago']);
-  const [scene, setScene] = useState<string>('Scene 1: The Call (Briefing)');
+  const [locations, setLocations] = useState<string[]>(['Vance\'s Apartment', 'University of Chicago', 'Woodfield Mall']);
+  const [scene, setScene] = useState<string>('Scene 2: The Mall Meeting');
 
   const [odds, setOdds] = useState<Odds>('50/50');
   const [fateQuestion, setFateQuestion] = useState('');
