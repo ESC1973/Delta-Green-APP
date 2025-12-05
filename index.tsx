@@ -101,7 +101,8 @@ const INITIAL_AGENTS: Agent[] = [
 const INITIAL_THREADS: ListItem[] = [
   { id: 't1', type: 'thread', title: 'Operation: VISCID GLIMMER', description: 'Locate Elias Vance and contain the threat.' },
   { id: 't2', type: 'thread', title: 'Find Elias Vance', description: 'Missing 48hrs from U of Chicago. Grad student. Occult ties?' },
-  { id: 't3', type: 'thread', title: 'Investigate Hyper-geometry', description: 'Vance\'s thesis topic. Possible link to Pre-Columbian myths.' }
+  { id: 't3', type: 'thread', title: 'Investigate Hyper-geometry', description: 'Vance\'s thesis topic. Possible link to Pre-Columbian myths.' },
+  { id: 't4', type: 'thread', title: 'Dr. J.C. Tillinghast', description: 'Discredited scientist (1920s). Claimed Aztec temples folded space. Paul recalled this name.' }
 ];
 
 const INITIAL_NPCS: ListItem[] = [
@@ -140,6 +141,31 @@ const INITIAL_LOGS: LogEntry[] = [
     timestamp: '10:42',
     type: 'dialogue',
     content: 'Jack: "We need some previous information about this menace. I don\'t want to go blind."\n\nTo Paul: "Does it ring a bell about this \'Hypergeometry in Pre-Columbian Architecture\'? Do you need additional info and where we can get it?"\n\nTo Tom: "Any clues how we should approach the interior of the apartment to avoid us being affected or at least analyze it? Maybe you should need some equipment we don\'t have in our hands now?"'
+  },
+  {
+    id: 'init-5',
+    timestamp: '10:45',
+    type: 'narrative',
+    content: 'The team confers. Tom notes he has PPE (N95s/Gloves) for everyone. He plans to collect samples at the apartment for later analysis and potentially incinerate evidence.\n\nPaul racks his brain for historical context on Vance\'s research topic.'
+  },
+  {
+    id: 'init-6',
+    timestamp: '10:46',
+    type: 'system',
+    content: 'Paul rolls History (70%): [38] SUCCESS.',
+    details: 'Paul recalls obscure 1920s papers by a Dr. J.C. Tillinghast claiming Aztec temples were machines designed to "fold space" or channel acoustic shadows. Discredited as pseudo-science.'
+  },
+  {
+    id: 'init-7',
+    timestamp: '10:47',
+    type: 'narrative',
+    content: 'Paul shares the Tillinghast connection. "Hyper-geometry" is a term popularized by Lovecraft and his circle, often referring to non-Euclidean spatial theories. However, in a Pre-Columbian context, he recalls obscure (and largely discredited) papers from the 1920s about Aztec temples designed to channel "acoustic shadows" or "fold space" using specific angles. Specifically, he remembers a controversial figure named Dr. J.C. Tillinghast who claimed Mayan step-pyramids were machines, not tombs. Most call it pseudo-science. Delta Green calls it a lead.'
+  },
+  {
+    id: 'init-8',
+    timestamp: '10:48',
+    type: 'dialogue',
+    content: 'Jack reacts to the history lesson: "Well that sounds f***ing crazy about those Indians."\n\nHe steps away to make a call to his CPD contact. "I\'m going to say this connects to missing students in other states. Just gathering info for a yearly analysis."\n\n(Jack attempting Persuade/Law check to get the officer\'s report.)'
   }
 ];
 
@@ -347,6 +373,10 @@ const DeltaGreenApp = () => {
         console.error('Failed to load save data', e);
       }
     }
+    
+    // Load draft input if exists
+    const savedInput = sessionStorage.getItem('dg_log_draft');
+    if (savedInput) setLogInput(savedInput);
   }, []);
 
   // Save to local storage whenever state changes
@@ -356,6 +386,11 @@ const DeltaGreenApp = () => {
     };
     localStorage.setItem('dg_ops_data', JSON.stringify(gameState));
   }, [agents, chaosFactor, logs, threads, npcs, locations, scene]);
+
+  // Save input draft to session storage
+  useEffect(() => {
+    sessionStorage.setItem('dg_log_draft', logInput);
+  }, [logInput]);
 
   useEffect(() => {
     // Scroll to bottom of log on update
@@ -458,6 +493,8 @@ const DeltaGreenApp = () => {
       setLocations(INITIAL_LOCATIONS);
       setScene({ title: 'Scene 2: The Mall Meeting', description: '10:30 AM at Woodfield Mall.' });
       localStorage.removeItem('dg_ops_data');
+      sessionStorage.removeItem('dg_log_draft');
+      setLogInput('');
       setShowSaveMenu(false);
       addLog('alert', 'SYSTEM RESET. Factory defaults restored.');
     }
