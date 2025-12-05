@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu, Upload, Download, Trash2, List, Plus, Camera, Hexagon, Square, Triangle, Circle } from 'lucide-react';
+import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu, Upload, Download, Trash2, List, Plus, Camera, Hexagon, Square, Triangle, Circle, Minus } from 'lucide-react';
 
 // --- Types ---
 
@@ -10,6 +10,7 @@ interface Agent {
   id: string;
   name: string;
   profession: string;
+  status: 'Friendly' | 'Agent';
   description: string;
   image?: string; // Base64 image string
   stats: Record<Stat, number>;
@@ -35,6 +36,7 @@ interface ListItem {
   title: string;
   description: string;
   type: 'thread' | 'npc' | 'location';
+  progress?: number; // 0-10 for threads
 }
 
 interface GameState {
@@ -59,6 +61,7 @@ const INITIAL_AGENTS: Agent[] = [
     id: 'jack',
     name: 'Jack Robbins',
     profession: 'Police Detective',
+    status: 'Friendly',
     description: '38 y/o. Sturdy build, weary eyes. Wears cheap suits. Smells of coffee.',
     stats: { STR: 13, CON: 13, DEX: 12, INT: 12, POW: 11, CHA: 11 },
     derived: {
@@ -77,6 +80,7 @@ const INITIAL_AGENTS: Agent[] = [
     id: 'tom',
     name: 'Tom Marteen',
     profession: 'Paramedic',
+    status: 'Friendly',
     description: '29 y/o. Lean, nervous energy. Practical dress (cargo pants, hoodies).',
     stats: { STR: 10, CON: 11, DEX: 12, INT: 15, POW: 14, CHA: 10 },
     derived: {
@@ -95,6 +99,7 @@ const INITIAL_AGENTS: Agent[] = [
     id: 'paul',
     name: 'Paul Smith',
     profession: 'Historian',
+    status: 'Friendly',
     description: '45 y/o. Soft build, glasses, tweed jackets. Professor at U of Chicago.',
     stats: { STR: 9, CON: 10, DEX: 10, INT: 17, POW: 14, CHA: 12 },
     derived: {
@@ -112,10 +117,10 @@ const INITIAL_AGENTS: Agent[] = [
 ];
 
 const INITIAL_THREADS: ListItem[] = [
-  { id: 't1', type: 'thread', title: 'Operation: VISCID GLIMMER', description: 'Locate Elias Vance and contain the threat.' },
-  { id: 't2', type: 'thread', title: 'Find Elias Vance', description: 'Missing 48hrs from U of Chicago. Grad student. Occult ties?' },
-  { id: 't3', type: 'thread', title: 'Investigate Hyper-geometry', description: 'Vance\'s thesis topic. Possible link to Pre-Columbian myths.' },
-  { id: 't4', type: 'thread', title: 'Dr. J.C. Tillinghast', description: 'Discredited scientist (1920s). Claimed Aztec temples folded space. Paul recalled this name.' }
+  { id: 't1', type: 'thread', title: 'Operation: VISCID GLIMMER', description: 'Locate Elias Vance and contain the threat.', progress: 0 },
+  { id: 't2', type: 'thread', title: 'Find Elias Vance', description: 'Missing 48hrs from U of Chicago. Grad student. Occult ties?', progress: 0 },
+  { id: 't3', type: 'thread', title: 'Investigate Hyper-geometry', description: 'Vance\'s thesis topic. Possible link to Pre-Columbian myths.', progress: 0 },
+  { id: 't4', type: 'thread', title: 'Dr. J.C. Tillinghast', description: 'Discredited scientist (1920s). Claimed Aztec temples folded space. Paul recalled this name.', progress: 0 }
 ];
 
 const INITIAL_NPCS: ListItem[] = [
@@ -243,6 +248,20 @@ const getFateProbability = (chaos: number, odds: Odds): number => {
 
 // --- Components ---
 
+// --- Icons Helper ---
+
+const getDieIcon = (sides: number) => {
+  switch(sides) {
+    case 4: return <Triangle className="w-3 h-3" />;
+    case 6: return <Square className="w-3 h-3" />;
+    case 8: return <span className="font-bold text-[10px]">d8</span>;
+    case 10: return <span className="font-bold text-[10px]">d10</span>;
+    case 20: return <Hexagon className="w-3 h-3" />;
+    case 100: return <span className="font-bold text-[10px]">00</span>;
+    default: return <Dice5 className="w-3 h-3" />;
+  }
+};
+
 const AgentCard: React.FC<{ agent: Agent; updateAgent: (a: Agent) => void }> = ({ agent, updateAgent }) => {
   const [expanded, setExpanded] = useState(false);
   const [isAddingSkill, setIsAddingSkill] = useState(false);
@@ -275,119 +294,127 @@ const AgentCard: React.FC<{ agent: Agent; updateAgent: (a: Agent) => void }> = (
   };
 
   return (
-    <div className="bg-slate-800 border border-slate-600 rounded-lg p-4 mb-4 shadow-lg transition-all duration-200 relative group">
+    <div 
+      className={`bg-slate-800 border border-slate-600 rounded-lg p-2 mb-4 shadow-lg transition-all duration-200 relative group ${expanded ? 'col-span-2 row-span-2 z-10' : ''}`}
+    >
+      {/* Collapsed Header - Always Visible */}
       <div 
-        className="flex justify-between items-start mb-2 cursor-pointer hover:bg-slate-700/50 rounded p-1 -m-1"
+        className="flex flex-col items-center text-center cursor-pointer p-2"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="flex items-center gap-3">
+        <div className="relative mb-3">
            {/* Avatar / Upload */}
            <div 
-             className="w-12 h-12 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center overflow-hidden relative group/avatar"
+             className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-slate-700 border-4 border-slate-600 flex items-center justify-center overflow-hidden relative group/avatar shrink-0 shadow-2xl"
              onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
            >
              {agent.image ? (
                <img src={agent.image} alt={agent.name} className="w-full h-full object-cover" />
              ) : (
-               <User className="w-6 h-6 text-slate-500" />
+               <User className="w-12 h-12 text-slate-500" />
              )}
              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
-               <Camera className="w-4 h-4 text-white" />
+               <Camera className="w-8 h-8 text-white" />
              </div>
              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
            </div>
+           {/* Status Badge */}
+            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-emerald-900 border border-emerald-500/50 text-[9px] font-bold text-emerald-200 rounded-full uppercase tracking-wider shadow-sm whitespace-nowrap">
+              {agent.status}
+            </span>
+        </div>
            
-           <div>
-            <h3 className="text-lg font-bold text-emerald-400">{agent.name}</h3>
-            <p className="text-xs text-slate-400 uppercase tracking-wider">{agent.profession}</p>
-           </div>
-        </div>
-        <ChevronRight className={`w-5 h-5 text-slate-500 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
+        <h3 className="text-lg font-bold text-emerald-400 leading-tight">{agent.name}</h3>
+        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">{agent.profession}</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs font-mono text-slate-300">
-        <div className="bg-slate-900 p-1 rounded" title="Strength">STR {agent.stats.STR}</div>
-        <div className="bg-slate-900 p-1 rounded" title="Constitution">CON {agent.stats.CON}</div>
-        <div className="bg-slate-900 p-1 rounded" title="Dexterity">DEX {agent.stats.DEX}</div>
-        <div className="bg-slate-900 p-1 rounded" title="Intelligence">INT {agent.stats.INT}</div>
-        <div className="bg-slate-900 p-1 rounded" title="Power">POW {agent.stats.POW}</div>
-        <div className="bg-slate-900 p-1 rounded" title="Charisma">CHA {agent.stats.CHA}</div>
-      </div>
-
-      <div className="space-y-2">
-        {/* HP */}
-        <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center text-red-400 w-16 font-bold" title="Hit Points"><Activity className="w-3 h-3 mr-1" /> HP</span>
-          <div className="flex items-center gap-2">
-             <button onClick={() => adjustStat('hp', -1)} className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-red-900 rounded text-slate-200">-</button>
-             <span className="w-12 text-center font-mono">{agent.derived.hp.current} / {agent.derived.hp.max}</span>
-             <button onClick={() => adjustStat('hp', 1)} className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-emerald-900 rounded text-slate-200">+</button>
-          </div>
-        </div>
-
-        {/* WP */}
-        <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center text-blue-400 w-16 font-bold" title="Willpower Points"><Brain className="w-3 h-3 mr-1" /> WP</span>
-          <div className="flex items-center gap-2">
-             <button onClick={() => adjustStat('wp', -1)} className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-red-900 rounded text-slate-200">-</button>
-             <span className="w-12 text-center font-mono">{agent.derived.wp.current} / {agent.derived.wp.max}</span>
-             <button onClick={() => adjustStat('wp', 1)} className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-emerald-900 rounded text-slate-200">+</button>
-          </div>
-        </div>
-
-        {/* SAN */}
-        <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center text-purple-400 w-16 font-bold" title="Sanity"><Dna className="w-3 h-3 mr-1" /> SAN</span>
-          <div className="flex items-center gap-2">
-             <button onClick={() => adjustStat('san', -1)} className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-red-900 rounded text-slate-200">-</button>
-             <span className="w-12 text-center font-mono">{agent.derived.san.current} / {agent.derived.san.max}</span>
-             <button onClick={() => adjustStat('san', 1)} className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-emerald-900 rounded text-slate-200">+</button>
-          </div>
-        </div>
-        <div className="text-xs text-right text-slate-500 mt-1">Break Point: {agent.derived.san.break}</div>
-      </div>
-      
+      {/* Expanded Content - Stats, Skills, Gear */}
       {expanded && (
-        <div className="mt-4 pt-2 border-t border-slate-600 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="mt-2 pt-3 border-t border-slate-600 space-y-3 animate-in fade-in zoom-in-95 duration-200 px-2 pb-2">
+          
+          {/* Stats Grid */}
+          <div className="grid grid-cols-3 gap-1 text-center text-[10px] font-mono text-slate-300">
+            <div className="bg-slate-900 p-1 rounded" title="Strength">STR {agent.stats.STR}</div>
+            <div className="bg-slate-900 p-1 rounded" title="Constitution">CON {agent.stats.CON}</div>
+            <div className="bg-slate-900 p-1 rounded" title="Dexterity">DEX {agent.stats.DEX}</div>
+            <div className="bg-slate-900 p-1 rounded" title="Intelligence">INT {agent.stats.INT}</div>
+            <div className="bg-slate-900 p-1 rounded" title="Power">POW {agent.stats.POW}</div>
+            <div className="bg-slate-900 p-1 rounded" title="Charisma">CHA {agent.stats.CHA}</div>
+          </div>
+
+          {/* Trackers */}
+          <div className="space-y-1.5 bg-slate-900/50 p-2 rounded">
+            {/* HP */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center text-red-400 font-bold" title="Hit Points"><Activity className="w-3 h-3 mr-1" /> HP</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => adjustStat('hp', -1)} className="w-5 h-5 flex items-center justify-center bg-slate-700 hover:bg-red-900 rounded text-slate-200">-</button>
+                <span className="w-8 text-center font-mono">{agent.derived.hp.current}/{agent.derived.hp.max}</span>
+                <button onClick={() => adjustStat('hp', 1)} className="w-5 h-5 flex items-center justify-center bg-slate-700 hover:bg-emerald-900 rounded text-slate-200">+</button>
+              </div>
+            </div>
+
+            {/* WP */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center text-blue-400 font-bold" title="Willpower Points"><Brain className="w-3 h-3 mr-1" /> WP</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => adjustStat('wp', -1)} className="w-5 h-5 flex items-center justify-center bg-slate-700 hover:bg-red-900 rounded text-slate-200">-</button>
+                <span className="w-8 text-center font-mono">{agent.derived.wp.current}/{agent.derived.wp.max}</span>
+                <button onClick={() => adjustStat('wp', 1)} className="w-5 h-5 flex items-center justify-center bg-slate-700 hover:bg-emerald-900 rounded text-slate-200">+</button>
+              </div>
+            </div>
+
+            {/* SAN */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center text-purple-400 font-bold" title="Sanity"><Dna className="w-3 h-3 mr-1" /> SAN</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => adjustStat('san', -1)} className="w-5 h-5 flex items-center justify-center bg-slate-700 hover:bg-red-900 rounded text-slate-200">-</button>
+                <span className="w-8 text-center font-mono">{agent.derived.san.current}/{agent.derived.san.max}</span>
+                <button onClick={() => adjustStat('san', 1)} className="w-5 h-5 flex items-center justify-center bg-slate-700 hover:bg-emerald-900 rounded text-slate-200">+</button>
+              </div>
+            </div>
+            <div className="text-[10px] text-right text-slate-500">Break Point: {agent.derived.san.break}</div>
+          </div>
+
            <div>
-            <p className="text-xs text-slate-400 mb-1 font-bold flex items-center gap-1"><FileText className="w-3 h-3" /> BIO</p>
-            <p className="text-xs text-slate-300 italic leading-relaxed">{agent.description}</p>
+            <p className="text-[10px] text-slate-400 mb-1 font-bold flex items-center gap-1"><FileText className="w-3 h-3" /> BIO</p>
+            <p className="text-[10px] text-slate-300 italic leading-relaxed">{agent.description}</p>
           </div>
           
           <div>
             <div className="flex justify-between items-center mb-1">
-               <p className="text-xs text-slate-400 font-bold flex items-center gap-1"><Brain className="w-3 h-3" /> SKILLS</p>
-               <button onClick={() => setIsAddingSkill(!isAddingSkill)} className="text-xs text-emerald-500 hover:text-emerald-400 flex items-center gap-1">
+               <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1"><Brain className="w-3 h-3" /> SKILLS</p>
+               <button onClick={() => setIsAddingSkill(!isAddingSkill)} className="text-[10px] text-emerald-500 hover:text-emerald-400 flex items-center gap-0.5">
                   <Plus className="w-3 h-3" /> Add
                </button>
             </div>
             
             {isAddingSkill && (
-              <form onSubmit={handleAddSkill} className="flex gap-2 mb-2">
+              <form onSubmit={handleAddSkill} className="flex gap-1 mb-1">
                 <input 
                   type="text" 
                   value={newSkill} 
                   onChange={(e) => setNewSkill(e.target.value)} 
-                  placeholder="Skill Name %"
-                  className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:border-emerald-500 outline-none"
+                  placeholder="Name %"
+                  className="flex-1 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-[10px] text-slate-200 focus:border-emerald-500 outline-none"
                   autoFocus
                 />
-                <button type="submit" className="bg-emerald-700 hover:bg-emerald-600 px-2 py-1 rounded text-xs">OK</button>
+                <button type="submit" className="bg-emerald-700 hover:bg-emerald-600 px-2 py-0.5 rounded text-[10px]">OK</button>
               </form>
             )}
 
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
               {agent.skills.map((skill, idx) => (
-                <span key={idx} className="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">{skill}</span>
+                <span key={idx} className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 border border-slate-600">{skill}</span>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="text-xs text-slate-400 mb-1 font-bold flex items-center gap-1"><Briefcase className="w-3 h-3" /> GEAR</p>
+            <p className="text-[10px] text-slate-400 mb-1 font-bold flex items-center gap-1"><Briefcase className="w-3 h-3" /> GEAR</p>
             <div className="flex flex-wrap gap-1">
               {agent.gear.map((item, idx) => (
-                <span key={idx} className="text-xs bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-slate-400">{item}</span>
+                <span key={idx} className="text-[10px] bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-slate-400">{item}</span>
               ))}
             </div>
           </div>
@@ -437,7 +464,7 @@ const DeltaGreenApp = () => {
         
         // Migration logic for old string arrays to new ListItem arrays
         if (parsed.threads && typeof parsed.threads[0] === 'string') {
-           setThreads(parsed.threads.map((t:string, i:number) => ({ id: `t${i}`, title: t, description: 'Legacy Data', type: 'thread' })));
+           setThreads(parsed.threads.map((t:string, i:number) => ({ id: `t${i}`, title: t, description: 'Legacy Data', type: 'thread', progress: 0 })));
         } else {
            setThreads(parsed.threads || INITIAL_THREADS);
         }
@@ -509,6 +536,20 @@ const DeltaGreenApp = () => {
     setAgents(prev => prev.map(a => a.id === updatedAgent.id ? updatedAgent : a));
   };
 
+  const updateThreadProgress = (id: string, val: number) => {
+    setThreads(prev => prev.map(t => {
+      if (t.id === id) {
+        const newProgress = Math.max(0, Math.min(10, (t.progress || 0) + val));
+        // Log progress update if changed
+        if (newProgress !== t.progress) {
+           // Optional: could log this change
+        }
+        return { ...t, progress: newProgress };
+      }
+      return t;
+    }));
+  };
+
   const handleExport = () => {
     const gameState: GameState = {
       agents, chaosFactor, logs, threads, npcs, locations, scene
@@ -540,7 +581,7 @@ const DeltaGreenApp = () => {
           setLogs(parsed.logs);
           // Migration logic also here for file imports
           if (parsed.threads && typeof parsed.threads[0] === 'string') {
-            setThreads(parsed.threads.map((t:string, i:number) => ({ id: `t${i}`, title: t, description: 'Legacy Data', type: 'thread' })));
+            setThreads(parsed.threads.map((t:string, i:number) => ({ id: `t${i}`, title: t, description: 'Legacy Data', type: 'thread', progress: 0 })));
           } else {
             setThreads(parsed.threads || []);
           }
@@ -655,20 +696,6 @@ const DeltaGreenApp = () => {
     setLogInput('');
   };
 
-  // --- Icons Helper ---
-
-  const getDieIcon = (sides: number) => {
-    switch(sides) {
-      case 4: return <Triangle className="w-3 h-3" />;
-      case 6: return <Square className="w-3 h-3" />;
-      case 8: return <span className="font-bold text-[10px]">d8</span>;
-      case 10: return <span className="font-bold text-[10px]">d10</span>;
-      case 20: return <Hexagon className="w-3 h-3" />;
-      case 100: return <span className="font-bold text-[10px]">00</span>;
-      default: return <Dice5 className="w-3 h-3" />;
-    }
-  };
-
   // --- Render ---
 
   return (
@@ -749,23 +776,33 @@ const DeltaGreenApp = () => {
       )}
 
       {/* Header */}
-      <header className="bg-slate-900 border-b border-emerald-900/30 p-3 md:p-4 flex items-center justify-between shadow-md z-10 shrink-0 relative">
-        <div className="flex items-center gap-3">
+      <header className="bg-slate-900 border-b border-emerald-900/30 p-3 md:p-4 flex items-center justify-between shadow-md z-10 shrink-0 relative overflow-hidden">
+        {/* Banner Background */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="https://images.unsplash.com/photo-1518546305927-5a555bb7020d?auto=format&fit=crop&w=1600&q=80" 
+            alt="Operation Background" 
+            className="w-full h-full object-cover object-center opacity-30 grayscale mix-blend-overlay"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/90 to-slate-900/95"></div>
+        </div>
+
+        <div className="flex items-center gap-3 z-10 relative">
           <Shield className="text-emerald-500 w-6 h-6 md:w-8 md:h-8" />
           <div>
-            <h1 className="text-lg md:text-xl font-black tracking-widest text-emerald-500">DELTA GREEN</h1>
-            <p className="text-[10px] md:text-xs text-slate-400 uppercase tracking-wide hidden md:block">Operation Manager // Clearance: TOP SECRET</p>
+            <h1 className="text-lg md:text-xl font-black tracking-widest text-emerald-500 drop-shadow-md">DELTA GREEN</h1>
+            <p className="text-[10px] md:text-xs text-slate-300 uppercase tracking-wide hidden md:block font-bold drop-shadow-sm">Operation Manager // Clearance: TOP SECRET</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 md:gap-6">
+        <div className="flex items-center gap-3 md:gap-6 z-10 relative">
           <div className="flex flex-col items-end hidden md:flex">
-            <span className="text-xs text-slate-500 uppercase">Operation</span>
-            <span className="font-mono text-emerald-400">VISCID GLIMMER</span>
+            <span className="text-xs text-slate-400 uppercase font-bold">Operation</span>
+            <span className="font-mono text-emerald-400 font-bold tracking-wider">VISCID GLIMMER</span>
           </div>
           
           <button 
             onClick={() => setShowSaveMenu(!showSaveMenu)}
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded border border-slate-700 transition-colors"
+            className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 px-3 py-1 rounded border border-slate-700 transition-colors backdrop-blur-sm"
             title="Save/Load Data"
           >
             <Save className="w-4 h-4 text-amber-400" />
@@ -774,7 +811,7 @@ const DeltaGreenApp = () => {
 
           <button 
             onClick={() => setShowHelp(true)}
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded border border-slate-700 transition-colors"
+            className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 px-3 py-1 rounded border border-slate-700 transition-colors backdrop-blur-sm"
           >
             <HelpCircle className="w-4 h-4 text-blue-400" />
             <span className="text-xs font-bold hidden md:inline">HELP</span>
@@ -900,8 +937,36 @@ const DeltaGreenApp = () => {
               <ul className="space-y-1">
                 {threads.map((t, i) => (
                   <li key={i} className="bg-slate-800 p-1.5 rounded border border-slate-700/50 hover:border-emerald-500/30 transition-colors">
-                    <div className="text-xs font-medium text-emerald-300 leading-tight">{t.title}</div>
-                    <div className="text-[10px] text-slate-500 leading-tight">{t.description}</div>
+                    <div className="flex justify-between items-start">
+                       <div>
+                         <div className="text-xs font-medium text-emerald-300 leading-tight">{t.title}</div>
+                         <div className="text-[10px] text-slate-500 leading-tight">{t.description}</div>
+                       </div>
+                       <div className="flex flex-col items-center ml-2">
+                         <div className="flex gap-1 items-center">
+                           <button 
+                             onClick={() => updateThreadProgress(t.id, -1)}
+                             className="text-slate-500 hover:text-red-400 transition-colors"
+                           >
+                             <Minus className="w-3 h-3" />
+                           </button>
+                           <button 
+                             onClick={() => updateThreadProgress(t.id, 1)}
+                             className="text-slate-500 hover:text-emerald-400 transition-colors"
+                           >
+                             <Plus className="w-3 h-3" />
+                           </button>
+                         </div>
+                         <div className="flex gap-0.5 mt-0.5">
+                           {Array.from({ length: 10 }).map((_, idx) => (
+                             <div 
+                               key={idx}
+                               className={`w-1.5 h-1.5 rounded-full ${idx < (t.progress || 0) ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                             />
+                           ))}
+                         </div>
+                       </div>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -998,7 +1063,7 @@ const DeltaGreenApp = () => {
           </div>
         </div>
 
-        {/* RIGHT: Agents */}
+        {/* RIGHT: Agents (Grid) */}
         <div className={`
           w-full md:w-1/4 min-w-[300px] bg-slate-900 border-l border-slate-800 p-4 overflow-y-auto
           absolute md:relative inset-0 z-10 md:z-0
@@ -1007,9 +1072,25 @@ const DeltaGreenApp = () => {
           <h2 className="text-sm font-bold text-emerald-500 uppercase mb-4 flex items-center gap-2 pb-2 border-b border-emerald-900/30">
             <Skull className="w-4 h-4" /> Roster: Active Agents
           </h2>
-          {agents.map(agent => (
-            <AgentCard key={agent.id} agent={agent} updateAgent={updateAgent} />
-          ))}
+          <div className="grid grid-cols-1 gap-2">
+            {/* Row 1 */}
+            <div className="grid grid-cols-2 gap-2">
+               {agents.slice(0,2).map(agent => (
+                 <AgentCard key={agent.id} agent={agent} updateAgent={updateAgent} />
+               ))}
+            </div>
+            {/* Row 2 (Paul + Empty/Future) */}
+             <div className="grid grid-cols-2 gap-2">
+               {agents.slice(2,3).map(agent => (
+                 <AgentCard key={agent.id} agent={agent} updateAgent={updateAgent} />
+               ))}
+               {/* Placeholder for future agent */}
+               <div className="bg-slate-800/50 border border-slate-700 border-dashed rounded-lg p-2 flex flex-col items-center justify-center text-slate-600 min-h-[160px]">
+                  <User className="w-12 h-12 mb-2 opacity-30" />
+                  <span className="text-[10px] uppercase font-bold tracking-widest opacity-50">Reserve Agent</span>
+               </div>
+            </div>
+          </div>
         </div>
 
       </div>
