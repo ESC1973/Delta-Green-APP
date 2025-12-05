@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu, Upload, Download, Trash2 } from 'lucide-react';
+import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu, Upload, Download, Trash2, List } from 'lucide-react';
 
 // --- Types ---
 
@@ -24,19 +24,29 @@ interface Agent {
 interface LogEntry {
   id: string;
   timestamp: string;
-  type: 'narrative' | 'mythic' | 'system' | 'combat' | 'alert';
+  type: 'narrative' | 'mythic' | 'system' | 'combat' | 'alert' | 'dialogue';
   content: string;
   details?: string;
+}
+
+interface ListItem {
+  id: string;
+  title: string;
+  description: string;
+  type: 'thread' | 'npc' | 'location';
 }
 
 interface GameState {
   agents: Agent[];
   chaosFactor: number;
   logs: LogEntry[];
-  threads: string[];
-  npcs: string[];
-  locations: string[];
-  scene: string;
+  threads: ListItem[];
+  npcs: ListItem[];
+  locations: ListItem[];
+  scene: {
+    title: string;
+    description: string;
+  };
 }
 
 type Odds = 'Impossible' | 'No Way' | 'Unlikely' | '50/50' | 'Likely' | 'Sure Thing' | 'Has To Be';
@@ -88,6 +98,24 @@ const INITIAL_AGENTS: Agent[] = [
   }
 ];
 
+const INITIAL_THREADS: ListItem[] = [
+  { id: 't1', type: 'thread', title: 'Operation: VISCID GLIMMER', description: 'Locate Elias Vance and contain the threat.' },
+  { id: 't2', type: 'thread', title: 'Find Elias Vance', description: 'Missing 48hrs from U of Chicago. Grad student. Occult ties?' },
+  { id: 't3', type: 'thread', title: 'Investigate Hyper-geometry', description: 'Vance\'s thesis topic. Possible link to Pre-Columbian myths.' }
+];
+
+const INITIAL_NPCS: ListItem[] = [
+  { id: 'n1', type: 'npc', title: 'Handler (Control)', description: 'Your Delta Green contact. Communicates via encrypted app. No face-to-face.' },
+  { id: 'n2', type: 'npc', title: 'Elias Vance', description: 'Target. 24yo. Missing. Apartment contains charcoal scrawls.' },
+  { id: 'n3', type: 'npc', title: 'Responding Officer', description: 'Reported nausea upon entering Vance\'s apartment. Identity needed.' }
+];
+
+const INITIAL_LOCATIONS: ListItem[] = [
+  { id: 'l1', type: 'location', title: 'Vance\'s Apartment', description: 'Hyde Park. Crime scene. "Charcoal scrawls" & Nausea reported.' },
+  { id: 'l2', type: 'location', title: 'University of Chicago', description: 'Vance\'s research site. Regenstein Library. Academic records.' },
+  { id: 'l3', type: 'location', title: 'Woodfield Mall', description: 'Current Location. Coffee shop. Secure meeting point.' }
+];
+
 const INITIAL_LOGS: LogEntry[] = [
   {
     id: 'init-1',
@@ -106,6 +134,12 @@ const INITIAL_LOGS: LogEntry[] = [
     timestamp: '10:30',
     type: 'narrative',
     content: 'SCENE 2: THE MALL MEETING\n\nLocation: Woodfield Mall. Time: 10:30 AM.\n\nThe team meets in a quiet corner of the food court to formulate a plan. The atmosphere is mundane—shoppers, pretzels, coffee—contrasting with the grim briefing. You need to decide how to approach the two primary leads: the Apartment (the crime scene) and the University (the research).'
+  },
+  {
+    id: 'init-4',
+    timestamp: '10:42',
+    type: 'dialogue',
+    content: 'Jack: "We need some previous information about this menace. I don\'t want to go blind."\n\nTo Paul: "Does it ring a bell about this \'Hypergeometry in Pre-Columbian Architecture\'? Do you need additional info and where we can get it?"\n\nTo Tom: "Any clues how we should approach the interior of the apartment to avoid us being affected or at least analyze it? Maybe you should need some equipment we don\'t have in our hands now?"'
   }
 ];
 
@@ -250,15 +284,19 @@ const DeltaGreenApp = () => {
   const [chaosFactor, setChaosFactor] = useState(5);
   const [logs, setLogs] = useState<LogEntry[]>(INITIAL_LOGS);
   const [logInput, setLogInput] = useState('');
-  const [showHelp, setShowHelp] = useState(true);
+  const [showHelp, setShowHelp] = useState(false);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'game' | 'log' | 'agents'>('log'); // Mobile tabs
   
-  // Adventure Lists
-  const [threads, setThreads] = useState<string[]>(['Operation: VISCID GLIMMER', 'Find Elias Vance']);
-  const [npcs, setNpcs] = useState<string[]>(['Handler (Control)']);
-  const [locations, setLocations] = useState<string[]>(['Vance\'s Apartment', 'University of Chicago', 'Woodfield Mall']);
-  const [scene, setScene] = useState<string>('Scene 2: The Mall Meeting');
+  // Adventure Lists (Updated to ListItem[])
+  const [threads, setThreads] = useState<ListItem[]>(INITIAL_THREADS);
+  const [npcs, setNpcs] = useState<ListItem[]>(INITIAL_NPCS);
+  const [locations, setLocations] = useState<ListItem[]>(INITIAL_LOCATIONS);
+  
+  const [scene, setScene] = useState({
+    title: 'Scene 2: The Mall Meeting',
+    description: '10:30 AM at Woodfield Mall. The team strategizes.'
+  });
 
   const [odds, setOdds] = useState<Odds>('50/50');
   const [fateQuestion, setFateQuestion] = useState('');
@@ -277,10 +315,33 @@ const DeltaGreenApp = () => {
         setAgents(parsed.agents);
         setChaosFactor(parsed.chaosFactor);
         setLogs(parsed.logs);
-        setThreads(parsed.threads);
-        setNpcs(parsed.npcs);
-        setLocations(parsed.locations);
-        setScene(parsed.scene);
+        
+        // Migration logic for old string arrays to new ListItem arrays
+        if (parsed.threads && typeof parsed.threads[0] === 'string') {
+           setThreads(parsed.threads.map((t:string, i:number) => ({ id: `t${i}`, title: t, description: 'Legacy Data', type: 'thread' })));
+        } else {
+           setThreads(parsed.threads || INITIAL_THREADS);
+        }
+
+        if (parsed.npcs && typeof parsed.npcs[0] === 'string') {
+           setNpcs(parsed.npcs.map((n:string, i:number) => ({ id: `n${i}`, title: n, description: 'Legacy Data', type: 'npc' })));
+        } else {
+           setNpcs(parsed.npcs || INITIAL_NPCS);
+        }
+
+        if (parsed.locations && typeof parsed.locations[0] === 'string') {
+           setLocations(parsed.locations.map((l:string, i:number) => ({ id: `l${i}`, title: l, description: 'Legacy Data', type: 'location' })));
+        } else {
+           setLocations(parsed.locations || INITIAL_LOCATIONS);
+        }
+
+        // Migration for scene (string to object)
+        if (typeof parsed.scene === 'string') {
+            setScene({ title: parsed.scene, description: 'Restored Scene' });
+        } else {
+            setScene(parsed.scene || { title: 'Scene 2: The Mall Meeting', description: '10:30 AM at Woodfield Mall.' });
+        }
+
         addLog('system', 'Mission data restored from local storage.');
       } catch (e) {
         console.error('Failed to load save data', e);
@@ -344,15 +405,36 @@ const DeltaGreenApp = () => {
       try {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content);
-        // Validate minimal structure
+        
         if (parsed.agents && parsed.logs) {
           setAgents(parsed.agents);
           setChaosFactor(parsed.chaosFactor);
           setLogs(parsed.logs);
-          setThreads(parsed.threads || []);
-          setNpcs(parsed.npcs || []);
-          setLocations(parsed.locations || []);
-          setScene(parsed.scene || 'Unknown Scene');
+          // Migration logic also here for file imports
+          if (parsed.threads && typeof parsed.threads[0] === 'string') {
+            setThreads(parsed.threads.map((t:string, i:number) => ({ id: `t${i}`, title: t, description: 'Legacy Data', type: 'thread' })));
+          } else {
+            setThreads(parsed.threads || []);
+          }
+
+          if (parsed.npcs && typeof parsed.npcs[0] === 'string') {
+            setNpcs(parsed.npcs.map((n:string, i:number) => ({ id: `n${i}`, title: n, description: 'Legacy Data', type: 'npc' })));
+          } else {
+            setNpcs(parsed.npcs || []);
+          }
+
+          if (parsed.locations && typeof parsed.locations[0] === 'string') {
+            setLocations(parsed.locations.map((l:string, i:number) => ({ id: `l${i}`, title: l, description: 'Legacy Data', type: 'location' })));
+          } else {
+            setLocations(parsed.locations || []);
+          }
+          
+          if (typeof parsed.scene === 'string') {
+             setScene({ title: parsed.scene, description: 'Restored Scene' });
+          } else {
+             setScene(parsed.scene || { title: 'Unknown Scene', description: '' });
+          }
+
           addLog('system', 'Mission data imported successfully.');
           setShowSaveMenu(false);
         } else {
@@ -363,7 +445,6 @@ const DeltaGreenApp = () => {
       }
     };
     reader.readAsText(file);
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -372,10 +453,10 @@ const DeltaGreenApp = () => {
       setAgents(INITIAL_AGENTS);
       setChaosFactor(5);
       setLogs(INITIAL_LOGS);
-      setThreads(['Operation: VISCID GLIMMER', 'Find Elias Vance']);
-      setNpcs(['Handler (Control)']);
-      setLocations(['Vance\'s Apartment', 'University of Chicago', 'Woodfield Mall']);
-      setScene('Scene 2: The Mall Meeting');
+      setThreads(INITIAL_THREADS);
+      setNpcs(INITIAL_NPCS);
+      setLocations(INITIAL_LOCATIONS);
+      setScene({ title: 'Scene 2: The Mall Meeting', description: '10:30 AM at Woodfield Mall.' });
       localStorage.removeItem('dg_ops_data');
       setShowSaveMenu(false);
       addLog('alert', 'SYSTEM RESET. Factory defaults restored.');
@@ -391,10 +472,9 @@ const DeltaGreenApp = () => {
     const probability = getFateProbability(chaosFactor, odds);
     const roll = Math.floor(Math.random() * 100) + 1;
     
-    // Check Doubles for Random Event
     const rollStr = roll.toString().padStart(2, '0');
     const isDoubles = rollStr[0] === rollStr[1];
-    const chaosDigit = parseInt(rollStr[0]); // In 2nd ed, digit must be <= chaos factor
+    const chaosDigit = parseInt(rollStr[0]);
     const randomEvent = isDoubles && chaosDigit <= chaosFactor;
 
     let result = 'NO';
@@ -404,7 +484,7 @@ const DeltaGreenApp = () => {
     else result = 'NO';
 
     addLog('mythic', `Q: ${fateQuestion}`, `Odds: ${odds} | Roll: ${roll} vs ${probability}% | Result: ${result}`);
-    if (window.innerWidth < 768) setActiveTab('log'); // Switch to log on mobile when action happens
+    if (window.innerWidth < 768) setActiveTab('log');
 
     if (randomEvent) {
       addLog('alert', 'RANDOM EVENT TRIGGERED!', `Doubles rolled (${roll}) under Chaos Factor (${chaosFactor}).`);
@@ -428,7 +508,6 @@ const DeltaGreenApp = () => {
     else if (focusRoll <= 83) focus = 'Ambiguous Event';
     else focus = 'NPC Negative';
 
-    // Simplified meaning tables (Action/Subject)
     const actionRoll1 = Math.floor(Math.random() * 100);
     const actionRoll2 = Math.floor(Math.random() * 100);
     
@@ -438,7 +517,7 @@ const DeltaGreenApp = () => {
   const handleDiceRoll = (sides: number) => {
     const result = Math.floor(Math.random() * sides) + 1;
     addLog('system', `Rolled d${sides}: ${result}`);
-    if (window.innerWidth < 768) setActiveTab('log'); // Switch to log on mobile
+    if (window.innerWidth < 768) setActiveTab('log'); 
   };
 
   const handleNarrativeSubmit = (e: React.FormEvent) => {
@@ -663,29 +742,56 @@ const DeltaGreenApp = () => {
             </div>
           </div>
 
-          {/* Lists */}
+          {/* Lists (Updated Design) */}
           <div className="flex-1 overflow-y-auto space-y-4">
             <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
               <h3 className="text-xs font-bold text-amber-500 uppercase mb-2 flex items-center gap-1"><Clapperboard className="w-3 h-3" /> Current Scene</h3>
-              <div className="text-sm text-slate-200">{scene}</div>
+              <div className="text-sm font-bold text-white">{scene.title}</div>
+              <div className="text-xs text-slate-400 mt-1">{scene.description}</div>
             </div>
 
+            {/* Threads List */}
             <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 border-b border-slate-700 pb-1">Threads</h3>
-              <ul className="text-sm space-y-1">
-                {threads.map((t, i) => <li key={i} className="text-slate-300 flex items-start"><ChevronRight className="w-4 h-4 text-slate-600 min-w-[16px] mt-0.5" /> {t}</li>)}
+              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 border-b border-slate-700 pb-1 flex items-center gap-2">
+                <List className="w-3 h-3" /> Threads
+              </h3>
+              <ul className="space-y-2">
+                {threads.map((t, i) => (
+                  <li key={i} className="bg-slate-800 p-2 rounded border border-slate-700/50">
+                    <div className="text-sm font-medium text-emerald-300">{t.title}</div>
+                    <div className="text-xs text-slate-500">{t.description}</div>
+                  </li>
+                ))}
               </ul>
             </div>
+
+            {/* NPCs List */}
             <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 border-b border-slate-700 pb-1">NPCs</h3>
-              <ul className="text-sm space-y-1">
-                {npcs.map((n, i) => <li key={i} className="text-slate-300 flex items-start"><ChevronRight className="w-4 h-4 text-slate-600 min-w-[16px] mt-0.5" /> {n}</li>)}
+              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 border-b border-slate-700 pb-1 flex items-center gap-2">
+                <User className="w-3 h-3" /> NPCs
+              </h3>
+              <ul className="space-y-2">
+                {npcs.map((n, i) => (
+                  <li key={i} className="bg-slate-800 p-2 rounded border border-slate-700/50">
+                    <div className="text-sm font-medium text-blue-300">{n.title}</div>
+                    <div className="text-xs text-slate-500">{n.description}</div>
+                  </li>
+                ))}
               </ul>
             </div>
+
+            {/* Locations List */}
             <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 border-b border-slate-700 pb-1">Locations</h3>
-              <ul className="text-sm space-y-1">
-                {locations.map((n, i) => <li key={i} className="text-slate-300 flex items-start"><MapPin className="w-4 h-4 text-slate-600 min-w-[16px] mt-0.5" /> {n}</li>)}
+              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 border-b border-slate-700 pb-1 flex items-center gap-2">
+                <MapPin className="w-3 h-3" /> Locations
+              </h3>
+              <ul className="space-y-2">
+                {locations.map((l, i) => (
+                  <li key={i} className="bg-slate-800 p-2 rounded border border-slate-700/50">
+                    <div className="text-sm font-medium text-amber-200/80">{l.title}</div>
+                    <div className="text-xs text-slate-500">{l.description}</div>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
@@ -713,12 +819,14 @@ const DeltaGreenApp = () => {
                 log.type === 'mythic' ? 'bg-blue-900/10 border-blue-500' :
                 log.type === 'system' ? 'bg-slate-800/30 border-slate-500 font-mono text-xs' :
                 log.type === 'alert' ? 'bg-red-900/20 border-red-500' :
+                log.type === 'dialogue' ? 'bg-slate-800/40 border-purple-500 italic' :
                 'bg-slate-800/20 border-emerald-600'
               }`}>
                 <div className="flex justify-between items-center mb-1">
                   <span className={`text-xs font-bold uppercase ${
                     log.type === 'mythic' ? 'text-blue-400' : 
                     log.type === 'alert' ? 'text-red-400' :
+                    log.type === 'dialogue' ? 'text-purple-400' :
                     log.type === 'narrative' ? 'text-emerald-400' : 'text-slate-400'
                   }`}>
                     {log.type === 'mythic' ? 'Oracle' : log.type}
