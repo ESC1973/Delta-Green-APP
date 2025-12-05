@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu, Upload, Download, Trash2, List, Plus, Camera } from 'lucide-react';
+import { Shield, Activity, Brain, Dna, Skull, Scroll, Terminal, AlertTriangle, ChevronRight, Save, RefreshCw, HelpCircle, Dice5, User, MapPin, Clapperboard, Briefcase, FileText, X, Menu, Upload, Download, Trash2, List, Plus, Camera, Hexagon, Square, Triangle, Circle } from 'lucide-react';
 
 // --- Types ---
 
@@ -655,6 +655,20 @@ const DeltaGreenApp = () => {
     setLogInput('');
   };
 
+  // --- Icons Helper ---
+
+  const getDieIcon = (sides: number) => {
+    switch(sides) {
+      case 4: return <Triangle className="w-3 h-3" />;
+      case 6: return <Square className="w-3 h-3" />;
+      case 8: return <span className="font-bold text-[10px]">d8</span>;
+      case 10: return <span className="font-bold text-[10px]">d10</span>;
+      case 20: return <Hexagon className="w-3 h-3" />;
+      case 100: return <span className="font-bold text-[10px]">00</span>;
+      default: return <Dice5 className="w-3 h-3" />;
+    }
+  };
+
   // --- Render ---
 
   return (
@@ -795,131 +809,129 @@ const DeltaGreenApp = () => {
         
         {/* LEFT: Mythic Controls */}
         <div className={`
-          w-full md:w-1/4 min-w-[300px] bg-slate-900 border-r border-slate-800 p-4 flex flex-col gap-6 overflow-y-auto
+          w-full md:w-1/4 min-w-[300px] bg-slate-900 border-r border-slate-800 p-2 md:p-3 flex flex-col gap-2 overflow-y-auto
           absolute md:relative inset-0 z-10 md:z-0
           ${activeTab === 'game' ? 'block' : 'hidden md:flex'}
         `}>
           
-          {/* Chaos Factor */}
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-sm font-bold text-red-400 uppercase flex items-center gap-2">
-                <Activity className="w-4 h-4" /> Mechanics: Chaos
-              </h2>
-              <span className="text-2xl font-bold font-mono text-white">{chaosFactor}</span>
-            </div>
-            <input 
-              type="range" min="1" max="9" 
-              value={chaosFactor} 
-              onChange={(e) => setChaosFactor(parseInt(e.target.value))}
-              className="w-full accent-red-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-            />
-            <div className="flex justify-between text-xs text-slate-500 mt-1">
-              <span>Order (1)</span>
-              <span>Mayhem (9)</span>
-            </div>
+          {/* COMPACT ROW: Chaos + Dice */}
+          <div className="flex gap-2">
+             {/* Chaos Factor - Compact */}
+             <div className="flex-1 bg-slate-800 p-2 rounded-lg border border-slate-700 flex flex-col justify-center min-w-0">
+                <div className="flex justify-between items-center mb-1">
+                  <h2 className="text-[10px] font-bold text-red-400 uppercase flex items-center gap-1 truncate">
+                    <Activity className="w-3 h-3" /> Chaos
+                  </h2>
+                  <span className="text-lg font-bold font-mono text-white leading-none">{chaosFactor}</span>
+                </div>
+                <input 
+                  type="range" min="1" max="9" 
+                  value={chaosFactor} 
+                  onChange={(e) => setChaosFactor(parseInt(e.target.value))}
+                  className="w-full accent-red-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                />
+             </div>
+
+             {/* Quick Dice - Compact */}
+             <div className="flex-[1.5] bg-slate-800 p-2 rounded-lg border border-slate-700 min-w-0">
+                <h2 className="text-[10px] font-bold text-slate-300 uppercase mb-1 flex items-center gap-1 truncate">
+                  <Dice5 className="w-3 h-3" /> Dice
+                </h2>
+                <div className="grid grid-cols-6 gap-1">
+                  {[4, 6, 8, 10, 20, 100].map(d => (
+                    <button 
+                      key={d} 
+                      onClick={() => handleDiceRoll(d)}
+                      className="bg-slate-700 hover:bg-slate-600 text-slate-300 h-6 rounded flex items-center justify-center transition-colors"
+                      title={`Roll d${d}`}
+                    >
+                      {getDieIcon(d)}
+                    </button>
+                  ))}
+                </div>
+             </div>
           </div>
 
-          {/* Fate Question */}
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-            <h2 className="text-sm font-bold text-blue-400 uppercase mb-3 flex items-center gap-2">
-              <HelpCircle className="w-4 h-4" /> Oracle: Fate Question
+          {/* Fate Question - Compact */}
+          <div className="bg-slate-800 p-2 rounded-lg border border-slate-700 shrink-0">
+            <h2 className="text-[10px] font-bold text-blue-400 uppercase mb-1 flex items-center gap-1">
+              <HelpCircle className="w-3 h-3" /> Oracle
             </h2>
-            <form onSubmit={handleFateRoll} className="space-y-3">
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Likelihood (Odds)</label>
-                <select 
+            <form onSubmit={handleFateRoll} className="space-y-2">
+              <div className="flex gap-2">
+                 <select 
                   value={odds} 
                   onChange={(e) => setOdds(e.target.value as Odds)}
-                  className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm focus:outline-none focus:border-blue-500"
+                  className="w-1/3 bg-slate-900 border border-slate-600 rounded px-1 py-1.5 text-xs focus:outline-none focus:border-blue-500 truncate"
                 >
                   {Object.keys(ODDS_MAP).map(o => (
                     <option key={o} value={o}>{o}</option>
                   ))}
                 </select>
+                <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-2 rounded text-xs transition-colors">
+                  ASK ORACLE
+                </button>
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Yes/No Question</label>
                 <input 
                   type="text" 
                   value={fateQuestion}
                   onChange={(e) => setFateQuestion(e.target.value)}
-                  placeholder="Is it locked? Is it trapped?"
+                  placeholder="Yes/No Question..."
                   className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm focus:outline-none focus:border-blue-500"
                 />
               </div>
-              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors">
-                ASK ORACLE
-              </button>
             </form>
           </div>
 
-          {/* Dice Roller */}
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-            <h2 className="text-sm font-bold text-slate-300 uppercase mb-3 flex items-center gap-2">
-              <Dice5 className="w-4 h-4" /> Quick Dice
-            </h2>
-            <div className="grid grid-cols-3 gap-2">
-              {[4, 6, 8, 10, 20, 100].map(d => (
-                <button 
-                  key={d} 
-                  onClick={() => handleDiceRoll(d)}
-                  className="bg-slate-700 hover:bg-slate-600 text-slate-300 py-1 rounded text-xs font-mono"
-                >
-                  d{d}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Lists (Updated Design) */}
-          <div className="flex-1 overflow-y-auto space-y-4">
-            <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
-              <h3 className="text-xs font-bold text-amber-500 uppercase mb-2 flex items-center gap-1"><Clapperboard className="w-3 h-3" /> Current Scene</h3>
-              <div className="text-sm font-bold text-white">{scene.title}</div>
-              <div className="text-xs text-slate-400 mt-1">{scene.description}</div>
+          {/* Lists (Expanded Space) */}
+          <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
+            <div className="bg-slate-800/50 p-2 rounded border border-slate-700 shrink-0">
+              <h3 className="text-[10px] font-bold text-amber-500 uppercase mb-1 flex items-center gap-1"><Clapperboard className="w-3 h-3" /> Current Scene</h3>
+              <div className="text-xs font-bold text-white leading-tight">{scene.title}</div>
+              <div className="text-[10px] text-slate-400 leading-tight mt-0.5">{scene.description}</div>
             </div>
 
             {/* Threads List */}
-            <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 border-b border-slate-700 pb-1 flex items-center gap-2">
+            <div className="shrink-0">
+              <h3 className="text-[10px] font-bold text-slate-500 uppercase mb-1 border-b border-slate-700 pb-0.5 flex items-center gap-1">
                 <List className="w-3 h-3" /> Threads
               </h3>
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {threads.map((t, i) => (
-                  <li key={i} className="bg-slate-800 p-2 rounded border border-slate-700/50">
-                    <div className="text-sm font-medium text-emerald-300">{t.title}</div>
-                    <div className="text-xs text-slate-500">{t.description}</div>
+                  <li key={i} className="bg-slate-800 p-1.5 rounded border border-slate-700/50 hover:border-emerald-500/30 transition-colors">
+                    <div className="text-xs font-medium text-emerald-300 leading-tight">{t.title}</div>
+                    <div className="text-[10px] text-slate-500 leading-tight">{t.description}</div>
                   </li>
                 ))}
               </ul>
             </div>
 
             {/* NPCs List */}
-            <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 border-b border-slate-700 pb-1 flex items-center gap-2">
+            <div className="shrink-0">
+              <h3 className="text-[10px] font-bold text-slate-500 uppercase mb-1 border-b border-slate-700 pb-0.5 flex items-center gap-1">
                 <User className="w-3 h-3" /> NPCs
               </h3>
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {npcs.map((n, i) => (
-                  <li key={i} className="bg-slate-800 p-2 rounded border border-slate-700/50">
-                    <div className="text-sm font-medium text-blue-300">{n.title}</div>
-                    <div className="text-xs text-slate-500">{n.description}</div>
+                  <li key={i} className="bg-slate-800 p-1.5 rounded border border-slate-700/50 hover:border-blue-500/30 transition-colors">
+                    <div className="text-xs font-medium text-blue-300 leading-tight">{n.title}</div>
+                    <div className="text-[10px] text-slate-500 leading-tight">{n.description}</div>
                   </li>
                 ))}
               </ul>
             </div>
 
             {/* Locations List */}
-            <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 border-b border-slate-700 pb-1 flex items-center gap-2">
+            <div className="shrink-0 pb-2">
+              <h3 className="text-[10px] font-bold text-slate-500 uppercase mb-1 border-b border-slate-700 pb-0.5 flex items-center gap-1">
                 <MapPin className="w-3 h-3" /> Locations
               </h3>
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {locations.map((l, i) => (
-                  <li key={i} className="bg-slate-800 p-2 rounded border border-slate-700/50">
-                    <div className="text-sm font-medium text-amber-200/80">{l.title}</div>
-                    <div className="text-xs text-slate-500">{l.description}</div>
+                  <li key={i} className="bg-slate-800 p-1.5 rounded border border-slate-700/50 hover:border-amber-500/30 transition-colors">
+                    <div className="text-xs font-medium text-amber-200/80 leading-tight">{l.title}</div>
+                    <div className="text-[10px] text-slate-500 leading-tight">{l.description}</div>
                   </li>
                 ))}
               </ul>
